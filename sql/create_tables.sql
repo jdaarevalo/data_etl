@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS data_challenge (
+  created_utc TIMESTAMP not null,
+  score int,
+  domain varchar(250),
+  id varchar(250),
+  title varchar(250),
+  ups int,
+  downs int, 
+  num_comments int,
+  permalink varchar(250),
+  selftext varchar(500),
+  link_flair_text varchar(500),
+  over_18 bool,
+  thumbnail varchar(500),
+  subreddit_id varchar(250),
+  edited bool,
+  link_flair_css_class varchar(250),
+  author_flair_css_class varchar(250),
+  is_self bool,
+  name varchar(250),
+  url varchar(250),
+  PRIMARY KEY (created_utc)
+);
