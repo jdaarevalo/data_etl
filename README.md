@@ -1,6 +1,8 @@
 # Data Challenge
 
-This project run with 2 postgres images, Postgres 9.6 as airflow database and Postgres 10.5 as a source database
+This project run with 2 postgres images, Postgres 9.6 as airflow database and Postgres 10.5 as a source database.
+
+
 This project is used for running data pipelines. Each pipeline is defined as a DAG (direct acyclic graph) and each job is defined as a task.
 All DAGs definitions are under the `dags` directory.
 
