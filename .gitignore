@@ -1,3 +1,4 @@
 .DS_Store
 postgres-data/*
 input/*
+notebooks/.ipynb_checkpoints/*
