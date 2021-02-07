@@ -3,15 +3,38 @@ import pendulum
 
 from datetime import datetime, timedelta
 
+from airflow import DAG
 from airflow import settings
 from airflow.models.connection import Connection
-
-from airflow import DAG
 from airflow.hooks.postgres_hook import PostgresHook
 from airflow.operators.python_operator import PythonOperator
 
 
 def create_or_update_conn(conn_id, conn_type, login=None, password=None, host=None, port=None, schema=None):
+    """         
+    Create or update a connection in airiflow
+                    
+    Parameters      
+    ----------      
+    connection_id : str
+        reference to a name of the connection
+    conn_type : str     
+        The connection type, could be postgres, mysql, aws, http ...
+    login : str, optional
+        The login, user for the connection
+    password : str, optional
+        The password for the connection
+    host : str, optional
+        The host for the connection
+    port : str, optional
+        The port for the connection
+    schema : str, optional
+        The schema for the connection
+
+    Returns
+    -------
+    None
+    """
     session = settings.Session()
     try:
         connection_query = session.query(Connection).filter(Connection.conn_id == conn_id)
@@ -37,7 +60,6 @@ def create_or_update_conn(conn_id, conn_type, login=None, password=None, host=No
 def execute_query_in_postgres(connection_id, query):
     """         
     Execute in the database a operation from the query.
-    The method returns None. If the query was executed,
                     
     Parameters      
     ----------      
@@ -53,20 +75,41 @@ def execute_query_in_postgres(connection_id, query):
     post_hook = PostgresHook(postgres_conn_id = connection_id)
     conn = post_hook.get_conn()
     cursor = conn.cursor()
-    cursor.execute(query)
+    result = cursor.execute(query)
     cursor.close()
     conn.commit()
 
+def get_records_from_query_in_postgres(connection_id, query):
+    """         
+    Execute in the database a operation from the query and get the results
+                    
+    Parameters      
+    ----------      
+    connection_id : str
+        reference to a specific database
+    query : str     
+        string with sql command select  ... from ... where ...
+
+    Returns
+    -------
+    result : str
+        the result of the query
+    """
+    post_hook = PostgresHook(postgres_conn_id = connection_id)
+    result = post_hook.get_records(query)
+    return result
+
 # Postgres 10.5 variables
 #TODO get this variables from env with os.environ["POSTGRES_USER"]
-POSTGRES_USER='postgres'
-POSTGRES_PASSWORD='postgres'
-POSTGRES_HOST= 'postgres'
-POSTGRES_PORT= 54321
-POSTGRES_SCHEMA='postgres'
+POSTGRES_USER = 'postgres'
+POSTGRES_PASSWORD = 'postgres'
+POSTGRES_HOST = 'postgres'
+POSTGRES_PORT = 54321
+POSTGRES_SCHEMA = 'postgres'
+
+CONNECTION_ID = 'POSTGRES_CONNECTION'
 
 # query to update values in postgres
-
 QUERY_TO_INSERT_OR_UPDATE = """insert into posts_2013​
                                (select created_utc, score, ups, downs, permalink, id, subreddit_id
                                from data_challenge
@@ -80,7 +123,17 @@ QUERY_TO_INSERT_OR_UPDATE = """insert into posts_2013​
                                   , permalink = excluded.permalink
                                   , subreddit_id = excluded.subreddit_id;"""
 
-QUERY_TOP_MOST_INTERESTING = """ """
+# query to get the top interesting
+QUERY_TOP_MOST_INTERESTING = """select subreddit_id, max(score) max_score
+                                from posts_2013​
+                                where ups > 5000 
+                                and downs > 5000
+                                    and ups - downs < 10000
+                                    group by 1
+                                    order by max_score desc 
+                                    limit 10;"""
+
+
 default_args = {
     'owner': 'data-challenge',
     'start_date': datetime(2021, 1, 5, tzinfo=pendulum.timezone("Europe/Berlin")),
@@ -93,7 +146,7 @@ dag = DAG("transformation", default_args=default_args, schedule_interval='00 1 *
 t_create_or_update_conn = PythonOperator(
                               task_id='update_create_postgres_connection',
                               python_callable=create_or_update_conn,
-                              op_kwargs={'conn_id': 'POSTGRES_CONNECTION',
+                              op_kwargs={'conn_id': CONNECTION_ID,
                                   'conn_type': 'postgres',
                                   'login' : POSTGRES_USER,
                                   'password' : POSTGRES_PASSWORD,
@@ -102,12 +155,18 @@ t_create_or_update_conn = PythonOperator(
                                   'schema' : POSTGRES_SCHEMA},
                               dag=dag)
 
-
 t_execute_query_postgres = PythonOperator(
                               task_id='execute_query_in_postgres',
                               python_callable=execute_query_in_postgres,
-                              op_kwargs={'connection_id': 'POSTGRES_CONNECTION',
+                              op_kwargs={'connection_id': CONNECTION_ID,
                                   'query': QUERY_TO_INSERT_OR_UPDATE},
                               dag=dag)
 
-t_create_or_update_conn >> t_execute_query_postgres
+t_execute_query_interest = PythonOperator(
+                              task_id='execute_query_top_interesting',
+                              python_callable=get_records_from_query_in_postgres,
+                              op_kwargs={'connection_id': 'POSTGRES_CONNECTION',
+                                  'query': QUERY_TOP_MOST_INTERESTING},
+                              dag=dag)
+
+_create_or_update_conn >> t_execute_query_postgres >> t_execute_query_interest
