@@ -169,4 +169,4 @@ t_execute_query_interest = PythonOperator(
                                   'query': QUERY_TOP_MOST_INTERESTING},
                               dag=dag)
 
-_create_or_update_conn >> t_execute_query_postgres >> t_execute_query_interest
+t_create_or_update_conn >> t_execute_query_postgres >> t_execute_query_interest
