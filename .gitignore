@@ -2,3 +2,4 @@
 postgres-data/*
 input/*
 notebooks/.ipynb_checkpoints/*
+dags/__pycache__/*
